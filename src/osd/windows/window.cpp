@@ -31,8 +31,12 @@
 #include "video.h"
 #include "input.h"
 #include "winutf8.h"
-
 #include "winutil.h"
+
+#ifdef FRONTEND
+#include <frontend.h>
+#endif
+
 
 extern int drawnone_init(running_machine &machine, osd_draw_callbacks *callbacks);
 extern int drawgdi_init(running_machine &machine, osd_draw_callbacks *callbacks);
@@ -579,6 +583,10 @@ void winwindow_toggle_full_screen(void)
 
 BOOL winwindow_has_focus(void)
 {
+#ifdef FRONTEND
+	return true;
+#endif
+
 	HWND focuswnd = GetFocus();
 	win_window_info *window;
 
@@ -1170,6 +1178,12 @@ int win_window_info::complete_create()
 	HMENU menu = NULL;
 	HDC dc;
 
+	HWND hwndParent = NULL;
+
+#ifdef FRONTEND
+	hwndParent = GetActiveWindow(); //getEmuBrowserConfig().g_emubrowserWndHinstance;
+#endif
+
 	assert(GetCurrentThreadId() == window_threadid);
 
 	// get the monitor bounds
@@ -1182,15 +1196,21 @@ int win_window_info::complete_create()
 			return 1;
 	}
 
+#ifdef FRONTEND
+	#define WINDOWCREATESTYLE WS_EX_NOACTIVATE | WS_EX_NOPARENTNOTIFY
+#else
+	#define WINDOWCREATESTYLE m_fullscreen ? FULLSCREEN_STYLE_EX : WINDOW_STYLE_EX
+#endif
+
 	// create the window, but don't show it yet
 	m_hwnd = win_create_window_ex_utf8(
-						m_fullscreen ? FULLSCREEN_STYLE_EX : WINDOW_STYLE_EX,
+						WINDOWCREATESTYLE,
 						"MAME",
 						m_title,
 						m_fullscreen ? FULLSCREEN_STYLE : WINDOW_STYLE,
 						monitorbounds.left() + 20, monitorbounds.top() + 20,
 						monitorbounds.left() + 100, monitorbounds.top() + 100,
-						NULL,//(win_window_list != NULL) ? win_window_list->m_hwnd : NULL,
+						hwndParent,
 						menu,
 						GetModuleHandleUni(),
 						NULL);
@@ -1222,6 +1242,26 @@ int win_window_info::complete_create()
 		minimize_window();
 	adjust_window_position_after_major_change();
 
+#ifdef FRONTEND
+	feSFrontEndInstance* pFrontEnd = feFrontEndInstance();
+	HWND hWnd = (HWND)pFrontEnd->m_iWindowHandle;
+
+	unsigned int iWidth = pFrontEnd->m_renderer.m_iSharedTargetWidth;
+	unsigned int iHeight = pFrontEnd->m_renderer.m_iSharedTargetHeight;
+	
+	SetWindowPos(m_hwnd, NULL, monitorbounds.left() - iWidth, monitorbounds.top() - iHeight, iWidth, iHeight, SWP_NOZORDER);
+	
+	m_renderer = draw.create(this);
+	if (m_renderer->create())
+		return 1;
+
+	ShowWindow(m_hwnd, SW_SHOWNA);
+	ShowWindow(m_hwnd, SW_HIDE);
+
+	SetFocus(hwndParent);
+	SetActiveWindow(hwndParent);
+	SetForegroundWindow(hwndParent);
+#else
 	// show the window
 	if (!m_fullscreen || m_fullscreen_safe)
 	{
@@ -1231,6 +1271,7 @@ int win_window_info::complete_create()
 			return 1;
 		ShowWindow(m_hwnd, SW_SHOW);
 	}
+#endif
 
 	// clear the window
 	dc = GetDC(m_hwnd);

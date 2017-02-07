@@ -217,7 +217,11 @@ void video_manager::frame_update(bool debug)
 	}
 
 	// draw the user interface
+#ifndef FRONTEND
+	//	eb_inputs_update();
+	//#else
 	machine().ui().update_and_render(&machine().render().ui_container());
+#endif
 
 	// if we're throttling, synchronize before rendering
 	attotime current_time = machine().time();

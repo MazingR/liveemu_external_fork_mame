@@ -34,6 +34,15 @@
 #include "debugger.h"
 #include "winfile.h"
 
+
+#ifdef FRONTEND
+#include <frontend.h>
+#include <feinputs.h>
+
+feSFrontEndInstance frontEnd;
+feSCommandListener commandsListener;
+#endif
+
 #define DEBUG_SLOW_LOCKS    0
 
 //**************************************************************************
@@ -257,7 +266,10 @@ static int is_double_click_start(int argc);
 static DWORD WINAPI watchdog_thread_entry(LPVOID lpParameter);
 static LONG WINAPI exception_filter(struct _EXCEPTION_POINTERS *info);
 
-
+#ifdef FRONTEND
+#define FRONTEND_INLINE
+#include "frontend.inl"
+#endif
 
 //**************************************************************************
 //  OPTIONS
@@ -385,6 +397,42 @@ const options_entry windows_options::s_option_entries[] =
 
 int main(int argc, char *argv[])
 {
+#ifdef FRONTEND
+
+#if defined(_DEBUG)
+	MessageBox(NULL, L"Debug mame !", L"Debug mame", 0);
+#endif
+
+	feresult res = FE_RESULT_OK;
+
+	// Initialization of FrontEnd
+	{
+		feFrontEndInstanceInit(&frontEnd);
+
+		feFrontEndInstanceParseCmdLine(&frontEnd, &argc, argv);
+
+		// Initialize input devices
+		feInputsInitialize(frontEnd.m_iWindowHandle, onParseEmuButton);
+
+		feInputsLoadPlayerBindings(0, szPlayerConfigTest);
+
+		//feInputsLoadPlayerBindings(1, szPlayerConfigTest);
+		//feInputsLoadPlayerBindings(2, szPlayerConfigTest);
+		//feInputsLoadPlayerBindings(3, szPlayerConfigTest);
+
+		// Startup commands server
+		res = feCommandServerStart(&frontEnd.m_commandServer, frontEnd.m_iServerListenPort);
+
+		// Register commands listener
+		memset(&commandsListener, 0, sizeof(feSCommandListener));
+
+		commandsListener.m_onExecuteCmd = onFrontEndCommand;
+
+		frontEnd.m_commandServer.m_pListener = &commandsListener;
+	}
+
+#endif // FRONTEND
+
 	// use small output buffers on non-TTYs (i.e. pipes)
 	if (!isatty(fileno(stdout)))
 		setvbuf(stdout, (char *) NULL, _IOFBF, 64);

@@ -103,6 +103,11 @@
 #include <ctype.h>
 #include <time.h>
 
+#ifdef FRONTEND
+#include <frontend.h>
+#include <feinputs.h>
+#endif
+
 // temporary: set this to 1 to enable the originally defined behavior that
 // a field specified via PORT_MODIFY which intersects a previously-defined
 // field completely wipes out the previous definition
@@ -755,7 +760,7 @@ digital_joystick::direction_t digital_joystick::add_axis(ioport_field &field)
 //  in a port
 //-------------------------------------------------
 
-void digital_joystick::frame_update()
+void digital_joystick::frame_update(int iPortIdx)
 {
 	// remember previous state and reset current state
 	m_previous = m_current;
@@ -764,12 +769,31 @@ void digital_joystick::frame_update()
 	// read all the associated ports
 	running_machine *machine = NULL;
 	for (direction_t direction = JOYDIR_UP; direction < JOYDIR_COUNT; ++direction)
+	{
+#ifdef FRONTEND
+		ioport_type directionPortType = (ioport_type)0;
+
+		switch (direction)
+		{
+		case JOYDIR_UP: directionPortType = IPT_JOYSTICK_UP;	   break;
+		case JOYDIR_DOWN: directionPortType = IPT_JOYSTICK_DOWN;   break;
+		case JOYDIR_LEFT: directionPortType = IPT_JOYSTICK_LEFT;   break;
+		case JOYDIR_RIGHT: directionPortType = IPT_JOYSTICK_RIGHT;  break;
+		default: directionPortType = (ioport_type)0;
+		}
+		if (iPortIdx >= 0 && feInputsPoll(iPortIdx, directionPortType))
+		{
+			m_current |= 1 << direction;
+		}
+#else
 		for (const simple_list_wrapper<ioport_field> *i = m_field[direction].first(); i != NULL; i = i->next())
 		{
 			machine = &i->object()->machine();
 			if (machine->input().seq_pressed(i->object()->seq(SEQ_TYPE_STANDARD)))
 				m_current |= 1 << direction;
 		}
+#endif // FRONTEND
+	}
 
 	// lock out opposing directions (left + right or up + down)
 	if ((m_current & (UP_BIT | DOWN_BIT)) == (UP_BIT | DOWN_BIT))
@@ -798,7 +822,7 @@ void digital_joystick::frame_update()
 		{
 			m_current4way ^= m_current4way & m_previous;
 		}
-
+#ifndef FRONTEND
 		//
 		//  If we are still pointing at a diagonal, we are in an indeterminant state.
 		//
@@ -818,6 +842,7 @@ void digital_joystick::frame_update()
 			else
 				m_current4way &= ~(UP_BIT | DOWN_BIT);
 		}
+#endif // FRONTEND
 	}
 }
 
@@ -1885,7 +1910,7 @@ void ioport_field::select_next_setting()
 //  digital field
 //-------------------------------------------------
 
-void ioport_field::frame_update(ioport_value &result, bool mouse_down)
+void ioport_field::frame_update(ioport_value &result, bool mouse_down, int iPortIdx)
 {
 	// skip if not enabled
 	if (!enabled())
@@ -1902,8 +1927,13 @@ void ioport_field::frame_update(ioport_value &result, bool mouse_down)
 	if (machine().ui().is_menu_active())
 		return;
 
+#ifdef FRONTEND
+	bool curstate = feInputsPoll(this->player(), m_type);
+#else
 	// if the state changed, look for switch down/switch up
 	bool curstate = mouse_down || machine().input().seq_pressed(seq()) || m_digital_value;
+#endif
+
 	bool changed = false;
 	if (curstate != m_live->last)
 	{
@@ -2301,14 +2331,14 @@ void ioport_port::write(ioport_value data, ioport_value mem_mask)
 //  frame_update - once/frame update
 //-------------------------------------------------
 
-void ioport_port::frame_update(ioport_field *mouse_field)
+void ioport_port::frame_update(ioport_field *mouse_field, int iPortIdx)
 {
 	// start with 0 values for the digital bits
 	m_live->digital = 0;
 
 	// now loop back and modify based on the inputs
 	for (ioport_field *field = first_field(); field != NULL; field = field->next())
-		field->frame_update(m_live->digital, field == mouse_field);
+		field->frame_update(m_live->digital, field == mouse_field, iPortIdx);
 
 	// hook for MESS's natural keyboard support
 	manager().natkeyboard().frame_update(*this, m_live->digital);
@@ -2578,7 +2608,7 @@ void ioport_manager::init_port_types()
 {
 	// convert the array into a list of type states that can be modified
 	construct_core_types(m_typelist);
-
+#ifndef FRONTEND
 	// ask the OSD to customize the list
 	machine().osd().customize_input_type_list(m_typelist);
 
@@ -2591,6 +2621,7 @@ void ioport_manager::init_port_types()
 		// also make a lookup table mapping type/player to the appropriate type list entry
 		m_type_to_entry[curtype->type()][curtype->player()] = curtype;
 	}
+#endif // FRONTEND
 }
 
 
@@ -2890,9 +2921,11 @@ g_profiler.start(PROFILER_INPUT);
 	m_last_delta_nsec = (curtime - m_last_frame_time).as_attoseconds() / ATTOSECONDS_PER_NANOSECOND;
 	m_last_frame_time = curtime;
 
+	int iJoystickIdx = 0;
+
 	// update the digital joysticks
 	for (digital_joystick *joystick = m_joystick_list.first(); joystick != NULL; joystick = joystick->next())
-		joystick->frame_update();
+		joystick->frame_update(iJoystickIdx++);
 
 	// compute default values for all the ports
 	update_defaults();
@@ -2917,9 +2950,10 @@ g_profiler.start(PROFILER_INPUT);
 	}
 
 	// loop over all input ports
+	int iPortIdx = 0;
 	for (ioport_port *port = first_port(); port != NULL; port = port->next())
 	{
-		port->frame_update(mouse_field);
+		port->frame_update(mouse_field, 0);
 
 		// handle playback/record
 		playback_port(*port);

@@ -40,6 +40,11 @@
 
 #include "winutil.h"
 
+#ifdef FRONTEND
+#include <frontend.h>
+#include <feinputs.h>
+#endif
+
 //============================================================
 //  PARAMETERS
 //============================================================
@@ -1120,7 +1125,9 @@ static void dinput_init(running_machine &machine)
 	int didevtype_joystick = DI8DEVCLASS_GAMECTRL;
 
 	dinput_version = DIRECTINPUT_VERSION;
+
 	result = DirectInput8Create(GetModuleHandleUni(), dinput_version, IID_IDirectInput8, (void **)&dinput, NULL);
+	
 	if (result != DI_OK)
 	{
 		dinput_version = 0;
@@ -1268,7 +1275,14 @@ static device_info *dinput_device_create(running_machine &machine, device_info *
 	}
 
 	// set the cooperative level
-	result = IDirectInputDevice_SetCooperativeLevel(devinfo->dinput.device, win_window_list->m_hwnd, cooperative_level);
+#ifdef FRONTEND
+	feSFrontEndInstance* pFrontEnd = feFrontEndInstance();
+	HWND hWnd = (HWND)pFrontEnd->m_iWindowHandle;
+#else
+	HWND hWnd = win_window_list->m_hwnd;
+#endif
+
+	result = IDirectInputDevice_SetCooperativeLevel(devinfo->dinput.device, hWnd, cooperative_level);
 	if (result != DI_OK)
 		goto error;
 	return devinfo;
@@ -1529,15 +1543,23 @@ static void dinput_mouse_poll(device_info *devinfo)
 
 static BOOL CALLBACK dinput_joystick_enum(LPCDIDEVICEINSTANCE instance, LPVOID ref)
 {
+#ifdef FRONTEND
+	DWORD cooperative_level = DISCL_BACKGROUND | DISCL_NONEXCLUSIVE;
+#else
 	DWORD cooperative_level = DISCL_FOREGROUND | DISCL_NONEXCLUSIVE;
+#endif
+
 	int axisnum, axiscount, povnum, butnum;
 	running_machine &machine = *(running_machine *)ref;
 	device_info *devinfo;
 	HRESULT result;
 
+#ifndef FRONTEND
 	if (win_window_list != NULL && win_window_list->win_has_menu()) {
 		cooperative_level = DISCL_BACKGROUND | DISCL_NONEXCLUSIVE;
 	}
+#endif
+
 	// allocate and link in a new device
 	devinfo = dinput_device_create(machine, &joystick_list, instance, &c_dfDIJoystick, NULL, cooperative_level);
 	if (devinfo == NULL)

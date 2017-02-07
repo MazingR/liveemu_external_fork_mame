@@ -785,7 +785,7 @@ public:
 	direction_t add_axis(ioport_field &field);
 
 	// updates
-	void frame_update();
+	void frame_update(int iPortIdx);
 
 private:
 	// internal state
@@ -1075,7 +1075,7 @@ public:
 	void select_next_setting();
 	void crosshair_position(float &x, float &y, bool &gotx, bool &goty);
 	void init_live_state(analog_field *analog);
-	void frame_update(ioport_value &result, bool mouse_down);
+	void frame_update(ioport_value &result, bool mouse_down, int iPortIdx = 0);
 	void reduce_mask(ioport_value bits_to_remove) { m_mask &= ~bits_to_remove; }
 
 	// user-controllable settings for a field
@@ -1209,7 +1209,7 @@ public:
 	// other operations
 	ioport_field *field(ioport_value mask);
 	void collapse_fields(std::string &errorbuf);
-	void frame_update(ioport_field *mouse_field);
+	void frame_update(ioport_field *mouse_field, int iPortIdx = 0);
 	void init_live_state();
 
 private:

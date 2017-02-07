@@ -84,6 +84,11 @@
 #include "network.h"
 #include <time.h>
 
+#ifdef FRONTEND
+#include <frontend.h>
+#include <feinputs.h>
+#endif
+
 #if defined(EMSCRIPTEN)
 #include <emscripten.h>
 
@@ -368,6 +373,12 @@ int running_machine::run(bool firstrun)
 		while ((!m_hard_reset_pending && !m_exit_pending) || m_saveload_schedule != SLS_NONE)
 		{
 			g_profiler.start(PROFILER_EXTRA);
+
+#ifdef FRONTEND
+			feresult res = FE_RESULT_OK;
+			res = feInputsUpdate();
+			res = feFrontEndExecuteCommands(feFrontEndInstance());
+#endif
 
 #if defined(EMSCRIPTEN)
 			//break out to our async javascript loop and halt

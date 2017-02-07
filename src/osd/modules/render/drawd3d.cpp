@@ -39,6 +39,10 @@
 #include "modules/render/d3d/d3dcomm.h"
 #include "drawd3d.h"
 
+#ifdef FRONTEND
+#include <frontend.h>
+#endif
+
 
 //============================================================
 //  DEBUGGING
@@ -783,6 +787,11 @@ void renderer::end_frame()
 	HRESULT result = (*d3dintf->device.end_scene)(m_device);
 	if (result != D3D_OK) osd_printf_verbose("Direct3D: Error %08X during device end_scene call\n", (int)result);
 
+#ifdef FRONTEND
+	feSFrontEndInstance* pFrontEnd = feFrontEndInstance();
+	feRendererUpdateSharedTarget(&pFrontEnd->m_renderer);
+#endif
+
 	// present the current buffers
 	result = (*d3dintf->device.present)(m_device, NULL, NULL, NULL, NULL, 0);
 	if (result != D3D_OK) osd_printf_verbose("Direct3D: Error %08X during device present call\n", (int)result);
@@ -928,7 +937,21 @@ try_again:
 		return failed;
 	}
 
+	
+
+#ifdef FRONTEND
+	int iRes = device_create_resources();
+
+	feSFrontEndInstance* pFrontEnd = feFrontEndInstance();
+	pFrontEnd->m_renderer.m_pD3dDevice = m_device;
+	feRendererInitSharedTarget(&pFrontEnd->m_renderer);
+	
+	return iRes;
+#else
 	return device_create_resources();
+#endif
+
+	
 }
 
 

@@ -13,19 +13,20 @@
 #include <d3dx9.h>
 #undef interface
 
+#pragma comment(lib,"d3d9.lib")
+#pragma comment(lib,"d3dx9.lib")
+
 // MAME headers
 #include "emu.h"
 
 // MAMEOS headers
 #include "d3dintf.h"
 
-
-
 //============================================================
 //  TYPE DEFINITIONS
 //============================================================
 
-typedef IDirect3D9 *(WINAPI *direct3dcreate9_ptr)(UINT SDKVersion);
+typedef IDirect3D9Ex *(WINAPI *direct3dcreate9_ptr)(UINT SDKVersion);
 
 namespace d3d
 {
@@ -77,7 +78,7 @@ base *drawd3d9_init(void)
 	}
 
 	// import the create function
-	direct3dcreate9_ptr direct3dcreate9 = (direct3dcreate9_ptr)GetProcAddress(dllhandle, "Direct3DCreate9");
+	direct3dcreate9_ptr direct3dcreate9 = (direct3dcreate9_ptr)GetProcAddress(dllhandle, "Direct3DCreate9Ex");
 	if (direct3dcreate9 == NULL)
 	{
 		osd_printf_verbose("Direct3D: Unable to find Direct3DCreate9\n");
@@ -86,7 +87,9 @@ base *drawd3d9_init(void)
 	}
 
 	// create our core direct 3d object
-	IDirect3D9 *d3d9 = (*direct3dcreate9)(D3D_SDK_VERSION);
+	IDirect3D9Ex *d3d9 = NULL;
+	Direct3DCreate9Ex(D3D_SDK_VERSION, &d3d9);
+
 	if (d3d9 == NULL)
 	{
 		osd_printf_verbose("Direct3D: Error attempting to initialize Direct3D9\n");
@@ -139,20 +142,20 @@ base *drawd3d9_init(void)
 
 static HRESULT check_device_format(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, D3DFORMAT adapterformat, DWORD usage, D3DRESOURCETYPE restype, D3DFORMAT format)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_CheckDeviceFormat(d3d9, adapter, devtype, adapterformat, usage, restype, format);
 }
 
 
 static HRESULT check_device_type(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, D3DFORMAT format, D3DFORMAT backformat, BOOL windowed)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_CheckDeviceType(d3d9, adapter, devtype, format, backformat, windowed);
 }
 
 static HRESULT create_device(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, HWND focus, DWORD behavior, present_parameters *params, device **dev)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	D3DPRESENT_PARAMETERS d3d9params;
 	convert_present_params(params, &d3d9params);
 	return IDirect3D9_CreateDevice(d3d9, adapter, devtype, focus, behavior, &d3d9params, (IDirect3DDevice9 **)dev);
@@ -160,28 +163,28 @@ static HRESULT create_device(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, HWN
 
 static HRESULT enum_adapter_modes(base *d3dptr, UINT adapter, D3DFORMAT format, UINT index, D3DDISPLAYMODE *mode)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_EnumAdapterModes(d3d9, adapter, format, index, mode);
 }
 
 
 static UINT get_adapter_count(base *d3dptr)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_GetAdapterCount(d3d9);
 }
 
 
 static HRESULT get_adapter_display_mode(base *d3dptr, UINT adapter, D3DDISPLAYMODE *mode)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_GetAdapterDisplayMode(d3d9, adapter, mode);
 }
 
 
 static HRESULT get_adapter_identifier(base *d3dptr, UINT adapter, DWORD flags, adapter_identifier *identifier)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	D3DADAPTER_IDENTIFIER9 id;
 	HRESULT result = IDirect3D9_GetAdapterIdentifier(d3d9, adapter, flags, &id);
 	memcpy(identifier->Driver, id.Driver, sizeof(identifier->Driver));
@@ -199,21 +202,21 @@ static HRESULT get_adapter_identifier(base *d3dptr, UINT adapter, DWORD flags, a
 
 static UINT get_adapter_mode_count(base *d3dptr, UINT adapter, D3DFORMAT format)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_GetAdapterModeCount(d3d9, adapter, format);
 }
 
 
 static HMONITOR get_adapter_monitor(base *d3dptr, UINT adapter)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	return IDirect3D9_GetAdapterMonitor(d3d9, adapter);
 }
 
 
 static HRESULT get_caps_dword(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, caps_index which, DWORD *value)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	D3DCAPS9 caps;
 	HRESULT result = IDirect3D9_GetDeviceCaps(d3d9, adapter, devtype, &caps);
 	switch (which)
@@ -239,7 +242,7 @@ static HRESULT get_caps_dword(base *d3dptr, UINT adapter, D3DDEVTYPE devtype, ca
 
 static ULONG release(base *d3dptr)
 {
-	IDirect3D9 *d3d9 = (IDirect3D9 *)d3dptr->d3dobj;
+	IDirect3D9Ex *d3d9 = (IDirect3D9Ex *)d3dptr->d3dobj;
 	ULONG result = IDirect3D9_Release(d3d9);
 	FreeLibrary(d3dptr->dllhandle);
 	global_free(d3dptr);

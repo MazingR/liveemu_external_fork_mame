@@ -95,7 +95,7 @@ void ui_input_init(running_machine &machine)
 void ui_input_frame_update(running_machine &machine)
 {
 	ui_input_private *uidata = machine.ui_input_data;
-
+#ifndef FRONTEND
 	/* update the state of all the UI keys */
 	for (ioport_type code = ioport_type(IPT_UI_FIRST + 1); code < IPT_UI_LAST; ++code)
 	{
@@ -103,6 +103,7 @@ void ui_input_frame_update(running_machine &machine)
 		if (!pressed || uidata->seqpressed[code] != SEQ_PRESSED_RESET)
 			uidata->seqpressed[code] = pressed;
 	}
+#endif
 }
 
 
